@@ -8,23 +8,18 @@ SECONDS=0
 DEVICE="pissarro"
 DATE=$(date '+%Y%m%d-%H%M')
 ZIPNAME="HydrogenKernel-${DEVICE}-${DATE}.zip"
-TC_DIR="$HOME/tc/proton-clang"
+TC_DIR="$HOME/toolchains/neutron-clang"
 DEFCONFIG="${DEVICE}_user_defconfig"
-
-clone_repo() {
-    local repo_url="$1"
-    local target_dir="$2"
-    if [ ! -d "$target_dir" ]; then
-        echo "Cloning $repo_url to $target_dir..."
-        git clone -q --depth=1 --single-branch "$repo_url" "$target_dir" || {
-            echo "Cloning failed! Aborting..."
-            exit 1
-        }
-    fi
-}
+CURRENT_DIR=$(pwd)
 
 # Ensure the toolchain is available
-clone_repo https://github.com/kdrag0n/proton-clang "$TC_DIR"
+if [ ! -d "$TC_DIR" ]; then
+    mkdir -p $TC_DIR
+    cd $TC_DIR
+    bash <(curl -s "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman") -S
+    bash <(curl -s "https://raw.githubusercontent.com/Neutron-Toolchains/antman/main/antman") --patch=glibc
+    cd $CURRENT_DIR
+fi
 export PATH="$TC_DIR/bin:$PATH"
 
 # Process options
@@ -49,7 +44,7 @@ make O=out ARCH=arm64 "$DEFCONFIG"
 echo -e "\nStarting compilation...\n"
 if make -j$(nproc --all) O=out ARCH=arm64 CC="ccache clang" LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_ARM32=arm-linux-gnueabi- Image.gz; then
     echo -e "\nKernel compiled successfully! Zipping up...\n"
-    clone_repo https://github.com/rio004/AnyKernel3 AnyKernel3
+    git clone -q --depth=1 https://github.com/rio004/AnyKernel3 AnyKernel3
     cp out/arch/arm64/boot/Image.gz AnyKernel3
     rm -rf *zip out/arch/arm64/boot
     (cd AnyKernel3 && zip -r9 "../$ZIPNAME" * -x '*.git*' README.md *placeholder)
